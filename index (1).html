@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Keeper — Live Storyboard</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- React + Babel (in-browser transform) -->
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script>
+  // Force the classic JSX runtime (React.createElement) so the app runs as a plain in-browser script.
+  Babel.registerPreset('react-classic', { presets: [[Babel.availablePresets['react'], { runtime: 'classic' }]] });
+</script>
+
+<!-- Firebase (compat build = simple globals; only used if you add config below) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<style>
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; background:#0f0c09; }
+  body{ font-family:'Archivo',system-ui,sans-serif; color:#E8E2D6; -webkit-font-smoothing:antialiased; }
+  ::selection{ background:#E8A24C; color:#0f0c09; }
+  ::-webkit-scrollbar{ width:11px; height:11px; }
+  ::-webkit-scrollbar-track{ background:#0f0c09; }
+  ::-webkit-scrollbar-thumb{ background:#2c251b; border-radius:6px; border:2px solid #0f0c09; }
+  ::-webkit-scrollbar-thumb:hover{ background:#3a3225; }
+
+  .wrap{ max-width:1480px; margin:0 auto; padding:40px 40px 96px; }
+  .mono{ font-family:'IBM Plex Mono',monospace; }
+
+  .grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(440px,1fr)); gap:30px; }
+  .card{ background:#15110c; border:1px solid #2a241b; border-radius:7px; overflow:hidden; display:flex; flex-direction:column; }
+
+  .imgwrap{ position:relative; width:100%; aspect-ratio:2.39/1; background:#191510; display:flex; align-items:center; justify-content:center; cursor:pointer; overflow:hidden; }
+  .imgwrap img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .imgwrap.drag{ outline:2px dashed #E8A24C; outline-offset:-6px; background:#241c11; }
+  .imghint{ font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.14em; color:#5a5346; text-align:center; padding:0 20px; pointer-events:none; }
+  .imgtools{ position:absolute; bottom:9px; right:9px; display:flex; gap:6px; opacity:0; transition:opacity .15s; }
+  .imgwrap:hover .imgtools{ opacity:1; }
+  .imgbtn{ font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:.06em; color:#E8E2D6; background:rgba(8,6,4,0.78); backdrop-filter:blur(3px); border:1px solid #3a3225; border-radius:3px; padding:4px 8px; cursor:pointer; }
+  .imgbtn:hover{ border-color:#E8A24C; color:#fff; }
+
+  textarea.edit{ width:100%; resize:none; overflow:hidden; border:1px solid transparent; background:transparent; color:inherit; font:inherit; padding:3px 5px; margin:-3px -5px; border-radius:4px; display:block; }
+  textarea.edit:hover{ border-color:#2f281e; }
+  textarea.edit:focus{ outline:none; border-color:#E8A24C; background:#0f0c08; }
+  input.chip{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:.06em; color:#A39A88; background:#1f1a13; border:1px solid #2f281e; border-radius:3px; padding:4px 8px; width:100%; }
+  input.chip:focus{ outline:none; border-color:#E8A24C; color:#fff; }
+
+  .iconbtn{ background:#1b1610; border:1px solid #2f281e; border-radius:4px; color:#A39A88; cursor:pointer; width:26px; height:24px; display:inline-flex; align-items:center; justify-content:center; font-size:13px; line-height:1; padding:0; }
+  .iconbtn:hover{ border-color:#E8A24C; color:#fff; }
+  .iconbtn:disabled{ opacity:.3; cursor:default; }
+
+  .banner{ background:#1d2733; border:1px solid #2d4254; border-radius:6px; padding:14px 18px; margin-bottom:30px; display:flex; gap:14px; align-items:flex-start; }
+  .live{ background:#13241a; border:1px solid #1f5a3a; }
+  details.cmt summary{ list-style:none; cursor:pointer; }
+  details.cmt summary::-webkit-details-marker{ display:none; }
+  a{ color:#5FA8E6; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- ============================================================= -->
+<!--  ▼▼▼  PASTE YOUR FIREBASE CONFIG HERE TO GO LIVE  ▼▼▼          -->
+<!--  Leave the strings empty to run in local demo mode.           -->
+<!--  See SETUP.md for exact click-by-click steps (~10 min).       -->
+<!-- ============================================================= -->
+<script>
+window.FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDy_adHgCqKgs4MIvW8LRV30bOwATuEZUY",
+  authDomain: "the-keeper---board.firebaseapp.com",
+  projectId: "the-keeper---board",
+  storageBucket: "the-keeper---board.firebasestorage.app",
+  messagingSenderId: "26886301099",
+  appId: "1:26886301099:web:bf53f3f4cb6d69b8b89eee"
+};
+</script>
+
+<!-- Data layer: identical API over Firestore (live) or localStorage (demo) -->
+<script>
+(function(){
+  "use strict";
+
+  // ---- image compression so frames fit Firestore's 1MB doc limit ----
+  window.fileToDataURL = function(file){
+    return new Promise(function(resolve, reject){
+      var img = new Image();
+      img.onload = function(){
+        var maxDim = 1400;
+        var scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        var w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+        var c = document.createElement('canvas'); c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        var q = 0.85, url = c.toDataURL('image/jpeg', q);
+        while(url.length > 950000 && q > 0.4){ q -= 0.1; url = c.toDataURL('image/jpeg', q); }
+        URL.revokeObjectURL(img.src);
+        resolve(url);
+      };
+      img.onerror = reject;
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
+  function sortPanels(arr){
+    return arr.slice().sort(function(a,b){
+      if(a.section !== b.section) return (SECTION_ORDER[a.section]||0) - (SECTION_ORDER[b.section]||0);
+      return (a.order||0) - (b.order||0);
+    });
+  }
+  window.SECTION_ORDER = { seq00:0, act1:1, act2:2, act3:3, act4:4, coda:5 };
+  var SECTION_ORDER = window.SECTION_ORDER;
+
+  // ---------------- Firestore-backed store ----------------
+  function FirestoreStore(){
+    firebase.initializeApp(window.FIREBASE_CONFIG);
+    this.db = firebase.firestore();
+    this.col = this.db.collection('panels');
+  }
+  FirestoreStore.prototype.mode = 'live';
+  FirestoreStore.prototype.seedIfEmpty = function(defaults){
+    var db = this.db, col = this.col;
+    var metaRef = db.collection('_meta').doc('board');
+    return db.runTransaction(function(tx){
+      return tx.get(metaRef).then(function(m){
+        if(m.exists && m.data().seeded) return;
+        defaults.forEach(function(p){ tx.set(col.doc(p.id), p); });
+        tx.set(metaRef, { seeded:true, ts: Date.now() });
+      });
+    });
+  };
+  FirestoreStore.prototype.subscribe = function(cb){
+    return this.col.onSnapshot(function(snap){
+      var arr = []; snap.forEach(function(d){ arr.push(d.data()); });
+      cb(sortPanels(arr));
+    });
+  };
+  FirestoreStore.prototype.update = function(id, patch){ return this.col.doc(id).set(patch, {merge:true}); };
+  FirestoreStore.prototype.add = function(panel){ return this.col.doc(panel.id).set(panel); };
+  FirestoreStore.prototype.remove = function(id){ return this.col.doc(id).delete(); };
+  FirestoreStore.prototype.addComment = function(id, comment){
+    return this.col.doc(id).update({ comments: firebase.firestore.FieldValue.arrayUnion(comment) });
+  };
+
+  // ---------------- localStorage demo store (cross-tab live via BroadcastChannel) ----------------
+  function LocalStore(){
+    this.KEY = 'keeper-board-v1';
+    this.listeners = [];
+    var self = this;
+    try { this.bc = new BroadcastChannel('keeper-board'); this.bc.onmessage = function(){ self._emit(); }; } catch(e){ this.bc = null; }
+    window.addEventListener('storage', function(e){ if(e.key === self.KEY) self._emit(); });
+  }
+  LocalStore.prototype.mode = 'local';
+  LocalStore.prototype._read = function(){ try { return JSON.parse(localStorage.getItem(this.KEY)) || {}; } catch(e){ return {}; } };
+  LocalStore.prototype._write = function(obj){ localStorage.setItem(this.KEY, JSON.stringify(obj)); if(this.bc) this.bc.postMessage(1); this._emit(); };
+  LocalStore.prototype._emit = function(){ var arr = sortPanels(Object.values(this._read())); this.listeners.forEach(function(cb){ cb(arr); }); };
+  LocalStore.prototype.seedIfEmpty = function(defaults){
+    var obj = this._read();
+    if(Object.keys(obj).length === 0){ defaults.forEach(function(p){ obj[p.id] = p; }); this._write(obj); }
+    return Promise.resolve();
+  };
+  LocalStore.prototype.subscribe = function(cb){ this.listeners.push(cb); this._emit(); var self=this; return function(){ self.listeners = self.listeners.filter(function(f){ return f!==cb; }); }; };
+  LocalStore.prototype.update = function(id, patch){ var o=this._read(); o[id]=Object.assign({}, o[id], patch); this._write(o); return Promise.resolve(); };
+  LocalStore.prototype.add = function(panel){ var o=this._read(); o[panel.id]=panel; this._write(o); return Promise.resolve(); };
+  LocalStore.prototype.remove = function(id){ var o=this._read(); delete o[id]; this._write(o); return Promise.resolve(); };
+  LocalStore.prototype.addComment = function(id, comment){ var o=this._read(); var p=o[id]; if(!p) return Promise.resolve(); p.comments=(p.comments||[]).concat([comment]); this._write(o); return Promise.resolve(); };
+
+  var cfg = window.FIREBASE_CONFIG || {};
+  var hasConfig = cfg.apiKey && cfg.projectId;
+  window.KeeperStore = hasConfig ? new FirestoreStore() : new LocalStore();
+})();
+</script>
+
+<!-- Seed data: all 46 panels -->
+<script>
+window.SECTIONS = [
+  { id:'seq00', kicker:'SEQ 00', title:'Cold Open',     scenes:'SC 1 — EXT. DEAD PLANET / SPACE',      defMode:'void'  },
+  { id:'act1',  kicker:'ACT I',  title:'The Watch',      scenes:'SC 2 — INT. STATION · CABIN',          defMode:'amber' },
+  { id:'act2',  kicker:'ACT II', title:'The Hail',       scenes:'SC 3 — INT. STATION · CABIN',          defMode:'amber' },
+  { id:'act3',  kicker:'ACT III',title:'Dark Protocol',  scenes:'SC 4–6 — INT. CABIN / EXT. STATION',   defMode:'amber' },
+  { id:'act4',  kicker:'ACT IV', title:'Eva',            scenes:'SC 7–8 — INT. CABIN / INSERT',         defMode:'blue'  },
+  { id:'coda',  kicker:'CODA',   title:'Day 258',        scenes:'SC 9–10 — EXT. STATION / INT. CABIN',  defMode:'amber' }
+];
+
+window.MODES = {
+  amber: { label:'AMBER · FANTASY', hex:'#E8A24C' },
+  blue:  { label:'BLUE · REALITY',  hex:'#5FA8E6' },
+  void:  { label:'VOID · SPACE',    hex:'#9AA3AD' },
+  black: { label:'OVER BLACK',      hex:'#6E6A63' },
+  white: { label:'WHITE-OUT',       hex:'#C9CDD2' }
+};
+
+(function(){
+  var raw = [
+    ['seq00','1.01','SC1 · EXT','ECU → WS','SLOW PUSH','void',
+     'A scarred world fills frame. No atmosphere, no light of its own. Long radial burns cross the crust — its exposed core still pulses its own destruction.',
+     'KEEPER (V.O.)','Another day in paradise. (small sigh)',
+     'Low electrical hum. The dead silence of the void.',
+     'Painted concept art, 2.39:1. A dead planet filling frame — black scarred crust, long glowing radial burn-scars, exposed molten core pulsing dull red. Cold void. Oversaturated, deeply textured, photoreal grandeur.'],
+    ['seq00','1.02','SC1 · EXT','WS','PUSH IN','void',
+     "A small station holds position above the planet — a dot that grows to fill the shot. Futuristic, rugged, aged. Warm light in two windows; everything else dark.",
+     'KEEPER (V.O.)','Year ninety-five. Day two hundred and fifty-seven. The smouldering remains of Ventura still flicker a sombre reminder through the cabin glass.',
+     'Hum continues; faint structural creak.',
+     'Painted concept art, 2.39:1. A small weathered orbital station in deep space above a dead planet, two windows glowing warm amber, the rest dark. Rugged futuristic hull, lived-in grime. Cinematic, oversaturated, photoreal.'],
+    ['seq00','1.03','SC1 · EXT','MS','STATIC','void',
+     'The station beacon pulses once — slow, blue-white, patient — throwing brief light across the hull, then fading.',
+     'KEEPER (V.O.)',"What happened here… it has to be honoured. It's why I'm here. It's why I'll never leave.",
+     'Single soft beacon tone; sub-bass swell and decay.',
+     "Painted concept art, 2.39:1. Close on a station's warning beacon emitting a slow blue-white pulse across a grimy hull in deep space, cold rim light, warm window glow behind. Cinematic, textured, oversaturated."],
+    ['seq00','1.04','TITLE','—','CUT','black',
+     'Cut to black. The main title resolves, then holds.',
+     'TITLE CARD','THE KEEPER',
+     'Silence, then a single low tone under the title.',
+     'Title card. Pure black field, centred heavy grotesque type reading "THE KEEPER", a faint amber underglow bleeding from the edges. Minimal, cinematic.'],
+
+    ['act1','2.01','SC2 · INT','WS','SLOW PAN','amber',
+     'Warm amber light. Brass fittings worn smooth. A small, well-kept space, arranged by someone with a long time to place every object exactly where she wants it.',
+     '','',
+     'Soft hum, ventilation, a distant tick.',
+     'Painted concept art, 2.39:1. Interior of a small lived-in space station cabin, warm amber light, worn brass fittings, neat personal objects, a viewport onto a dead planet. Cozy yet melancholy. Deep texture, oversaturated, photoreal.'],
+    ['act1','2.02','SC2 · INT','CU','STATIC','amber',
+     'Time-lapse vignette — a clean uniform, pressed, the collar squared.',
+     '','',
+     'Cloth; the quiet of ritual.',
+     'Painted concept art, 2.39:1. Macro on a crisp pressed futuristic uniform collar being squared, warm amber light, fine fabric weave, a brass clasp. Intimate, tactile, oversaturated.'],
+    ['act1','2.03','SC2 · INT','MCU','STATIC','amber',
+     'A small green plant in a brass pot by the viewport. She turns it a quarter so the leaves face the light.',
+     '','',
+     'Pot scrape on brass, faint.',
+     'Painted concept art, 2.39:1. A small healthy green plant in a worn brass pot on a sill beside a station viewport, dead planet beyond the glass, warm amber light. Tactile, photoreal, oversaturated.'],
+    ['act1','2.04','SC2 · INT','MS','STATIC','amber',
+     'A meal, alone, eaten without hurry.',
+     '','',
+     'Cutlery, a swallow, the hum.',
+     'Painted concept art, 2.39:1. A lone woman eating a simple meal at a small table in a warm amber station cabin, calm and unhurried, viewport behind her. Cinematic, intimate, deep texture, oversaturated.'],
+    ['act1','2.05','SC2 · INT','CU','SLOW PUSH','amber',
+     'The Keeper — mid-30s, blonde, athletic, in a sleek futuristic amorphic suit. She lifts a handheld recorder to her mouth. A calm that was built, not born.',
+     'KEEPER (V.O.)','Year ninety-five… god. (a small pause on the number — she does not react)',
+     'Recorder click; her breath.',
+     'Painted concept art, 2.39:1. CU of a pretty mid-30s blonde woman, athletic, in a sleek close-fit futuristic spacesuit, speaking into a handheld recorder, warm amber cabin light. Hyper-real skin with deep pore detail, oversaturated, Secret Level grade.'],
+    ['act1','2.06','SC2 · INT','CU','STATIC','amber',
+     'Her face — steady, worn. A discipline she put on a long time ago and never took off.',
+     'KEEPER (V.O.)',"I know I'll die here on this station. One day. And when I do, another will come to replace me…",
+     'Hum; a held silence.',
+     "Painted concept art, 2.39:1. Intimate CU of a calm, weathered blonde woman's face in warm amber light, eyes steady but tired, fine realistic skin detail. Cinematic, oversaturated, melancholic."],
+    ['act1','2.07','SC2 · INT','OTS','STATIC','amber',
+     'She sets the recorder down and looks out the viewport at the dead world below.',
+     'KEEPER (V.O.)',"I've been here for so long… I can't even remember the beginning. I arrived long after the planet was no more.",
+     'Low hum; faint beacon tick.',
+     'Painted concept art, 2.39:1. Over-the-shoulder of a woman in a futuristic suit gazing through a station viewport at a vast dead scarred planet below, warm cabin light against cold planet light. Cinematic, deep texture, oversaturated.'],
+    ['act1','2.08','SC2 · INT','MCU','STATIC','amber',
+     'She tends the plant — a practised, gentle motion — while looking out at the planet.',
+     'KEEPER (V.O.)',"What the hell happened here? A question I'll never get an answer to.",
+     'Soft soil, leaves, the hum.',
+     "Painted concept art, 2.39:1. A woman's hands gently tending a small green plant in a brass pot, her gaze out the viewport to a dead planet, warm amber light. Tactile, intimate, oversaturated."],
+
+    ['act2','3.01','SC3 · INT','WS → MS','HANDHELD FOLLOW','amber',
+     'A soft chime, then a measured proximity alarm — the station built never to panic. She crosses to the comms console without hurry.',
+     '','',
+     'Soft chime → low pulsing alarm tone.',
+     'Painted concept art, 2.39:1. A woman crossing a warm amber station cabin toward a comms console as a soft alert glows, controlled urgency in her stride. Cinematic, lived-in, oversaturated.'],
+    ['act2','3.02','SC3 · INT','CU INSERT','STATIC','amber',
+     'The board shows a flickering red light. A contact inside the perimeter line — the first in longer than she can recall.',
+     'INTERCOM (V.O.)','Contact. Inside the perimeter line.',
+     'Alarm; flicker buzz.',
+     'Painted concept art, 2.39:1. CU of a retro-futuristic console board, one red contact light flickering inside a radar perimeter ring, warm reflections on glass. Tactile, photoreal, oversaturated.'],
+    ['act2','3.03','SC3 · INT','CU','SLOW PUSH','amber',
+     'She studies it a moment longer than the words suggest. Something in her stills.',
+     'KEEPER (mouthing)','What? What are you doing all the way out here?',
+     'The alarm dampens under her breath.',
+     'Painted concept art, 2.39:1. CU of a blonde woman staring at a console, faint dread surfacing beneath trained calm, warm amber light, realistic skin. Cinematic, oversaturated.'],
+    ['act2','3.04','SC3 · INT','MS','STATIC','amber',
+     'She keys the transmitter. Level, trained, carrying — a challenge, not a greeting.',
+     'KEEPER (into comms)','Unidentified vessel. You have crossed a marked exclusion zone. This is a radiological grave site. It is not safe. Come about and withdraw. Immediately.',
+     'Transmitter key; her voice close in the room tone.',
+     'Painted concept art, 2.39:1. A woman in a futuristic suit speaking firmly into a comms transmitter at a console, jaw set, warm amber light. Authoritative, cinematic, deep texture.'],
+    ['act2','3.05','SC3 · INT','MCU','STATIC','amber',
+     'Static. The shape on the board does not change course. She repeats — same flat authority, a fraction slower.',
+     'KEEPER (into comms)','This is Keeper 456-89 of the UCO. Come about and withdraw. Final advisory.',
+     'Carrier static; dead air.',
+     'Painted concept art, 2.39:1. CU profile of a woman repeating a stern comms warning, console glow on her face, controlled tension, warm amber. Cinematic, oversaturated, realistic skin.'],
+    ['act2','3.06','SC3 · INT','CU','STATIC','amber',
+     'The reply: a distorted, reaching voice — and one word surfaces clean. The name lands somewhere it should not. Her hand stays on the console.',
+     'VOICE (filtered)','Eva.',
+     'Distorted transmission; the single clean word.',
+     'Painted concept art, 2.39:1. CU of a woman frozen at a console as an unsettling word reaches her — a micro-expression of recognition she cannot place, warm amber light, realistic skin. Cinematic, oversaturated.'],
+    ['act2','3.07','SC3 · INT','CU','SLOW PUSH','amber',
+     'A thin rising tone — the room begins to ring. From here we are inside her hearing, not the channel.',
+     'VOICE / KEEPER (V.O.)','"Eva… please…"  —  That is not my designation!',
+     'Tinnitus whine rises, swallowing the transmission.',
+     'Painted concept art, 2.39:1. CU of a woman face as a high ringing overtakes her, warm amber light starting to feel subtly wrong, unease creeping in, realistic skin texture. Cinematic, oversaturated.'],
+    ['act2','3.08','SC3 · INT','ECU INSERT','STATIC','blue',
+     'FIRST INTRUSION — a single frame: her hand on the console is wrong. Half-mechanical, distorted. Then normal again.',
+     '','',
+     'A hard digital stab; gone.',
+     'Painted concept art, 2.39:1. ECU of a human hand on a console flickering half-mechanical — alloy fused into flesh, distorted — under cold blue light for a single frame. Body horror, photoreal, oversaturated.'],
+    ['act2','3.09','SC3 · INT','CU','STATIC','amber',
+     'She looks at her own hand. Flexes it. It is a hand. Her face scrunches as she tries to parse the distortion.',
+     'KEEPER (V.O.)','…I am not myself. Who the fuck is Eva?',
+     'Hum returns; her unsteady breath.',
+     'Painted concept art, 2.39:1. CU of a woman examining her own hand with confusion and fear, warm amber light, realistic skin. Cinematic, intimate, oversaturated.'],
+
+    ['act3','4.01','SC4 · INT','MS','HANDHELD','amber',
+     'The contact keeps closing. The name keeps coming, fainter under the ring — Eva, Eva. Each repetition costs her something.',
+     'VOICE (under ring)','Eva… Eva…',
+     'Layered name under tinnitus; alarm beneath.',
+     'Painted concept art, 2.39:1. A woman bracing at a console, overwhelmed by an unheard repeating name, warm amber light fraying at the edges. Cinematic, oversaturated, tense.'],
+    ['act3','4.02','SC4 · INT','WS (V/PORT)','STATIC','blue',
+     'INTRUSION — the viewport, for an instant, is crowded with debris that was not there. Hulls. Dozens. A slow ring of them.',
+     '','',
+     'Silence; a cold tonal drone.',
+     'Painted concept art, 2.39:1. A station viewport revealing, in cold blue light, a vast slow ring of wrecked ship hulls drifting around a dead planet. Eerie, photoreal, oversaturated.'],
+    ['act3','4.03','SC4 · INT','ECU INSERT','STATIC','blue',
+     'INTRUSION — the handheld recorder is, for a frame, a paper service record, stamped with a number.',
+     '','',
+     'Paper-rustle stab.',
+     'Painted concept art, 2.39:1. ECU of a handheld recorder glitching into an old stamped paper service record bearing a serial number, cold blue light. Photoreal, unsettling, oversaturated.'],
+    ['act3','4.04','SC4 · INT','MCU','STATIC','blue',
+     'INTRUSION — the plant in its brass pot is dead. Black, collapsed in the soil.',
+     '','',
+     'Dry crackle; the drone.',
+     'Painted concept art, 2.39:1. MCU of the same plant now dead — blackened, collapsed in dry soil in a tarnished brass pot — under cold blue light. Photoreal decay, oversaturated.'],
+    ['act3','4.05','SC4 · EXT','WS','FAST ZOOM ACROSS VOID','void',
+     'She glances out at the distant dot of the foreign vessel. The camera races across the void — a ship rapidly approaching.',
+     'VOICE / KEEPER','"Eva… please… we are here to help—" (scrubbed)  —  Are you jamming me? What are you doing here?!',
+     'Distorted plea; the word "help" scrubbed to noise.',
+     'Painted concept art, 2.39:1. A lone rescue vessel approaching fast across deep space toward a small station above a dead planet, cold starlight. Cinematic scale, photoreal, oversaturated.'],
+    ['act3','4.06','SC4 · INT','MS','STATIC','amber',
+     'Drilled but flustered, she moves to a heavy switch set into the bulkhead. Her hand closes on it.',
+     '','',
+     'Footstep, metal, breath.',
+     'Painted concept art, 2.39:1. A woman reaching for a heavy industrial switch set into a station bulkhead, warm amber light, tension in her posture. Tactile, cinematic, oversaturated.'],
+    ['act3','4.07','SC4 · INT','ECU','STATIC · HELD','blue',
+     'INTRUSION, HELD LONGER — the switch is not a switch. It is a biological connector grown into the wall, running into her chest beneath the uniform. The hand on it is not a hand.',
+     '','',
+     'Wet organic creak; the drone deepens.',
+     'Painted concept art, 2.39:1. ECU body horror — a biomechanical connector grown out of a station wall and fused into a woman chest beneath her suit, gripped by a part-alloy hand, cold blue light, fluid and mechanism. Photoreal, deeply textured, oversaturated.'],
+    ['act3','4.08','SC4 · INT','MS','STATIC','amber',
+     'Amber again. Just a switch. Just her hand. She pulls it.',
+     'KEEPER (V.O.)','Dark Protocol engaging. They will not see us. …Then universe protect them against what is out there.',
+     'Heavy clunk of the switch.',
+     'Painted concept art, 2.39:1. A woman pulling a heavy bulkhead switch with grim resolve, warm amber light, jaw set. Cinematic, oversaturated, realistic skin.'],
+    ['act3','5.01','SC5 · EXT','WS','STATIC','blue',
+     'A silent blue pulse blooms out from the station — soundless, enormous, clean.',
+     '','',
+     'Total silence. Sub-bass felt, not heard.',
+     'Painted concept art, 2.39:1. An enormous silent blue energy pulse blooming outward from a small station in deep space, clean and soundless, dead planet below. Awe and dread, photoreal, oversaturated.'],
+    ['act3','5.02','SC5 · EXT','WS','STATIC','void',
+     'The vessel bursts from within — debris, no fire, all in silence. A new scatter drifts out to join a much larger field beyond frame.',
+     '','',
+     'Silence; faint metallic patter of debris.',
+     'Painted concept art, 2.39:1. A spacecraft silently bursting apart from within into cold debris (no fire) above a dead planet, fragments drifting toward an unseen larger field. Eerie, photoreal, oversaturated.'],
+    ['act3','6.01','SC6 · INT','MS','STATIC','amber',
+     'In here it reads as relief. The cabin dims to protective blue, then warms back to amber. The board is clear. The ring fades.',
+     'KEEPER (V.O.)',"Clear. It's clear.",
+     'Alarm dies; hum returns; an exhale.',
+     'Painted concept art, 2.39:1. A woman exhaling at a now-clear console as cabin light shifts from cold blue back to warm amber, relief on her face. Cinematic, oversaturated, realistic skin.'],
+    ['act3','6.02','SC6 · INT','CU INSERT','STATIC','amber',
+     'She notices her own hand. It is shaking violently. She watches it as though it belongs to someone else, then closes it into a fist until it stops.',
+     'KEEPER (V.O.)','…That is… weird.',
+     'Quiet; the hum; her breath.',
+     'Painted concept art, 2.39:1. CU of a violently trembling human hand held in warm amber light, slowly clenched into a fist, realistic skin and tendon detail. Intimate, unsettling, oversaturated.'],
+
+    ['act4','7.01','SC7 · INT','MS','SLOW PUSH','amber',
+     'She resets for the next watch. The name returns — not over comms, in the room. One voice, then more, layered, patient, everywhere. The walls have it.',
+     'VOICES','Eva… Eva… Eva…',
+     'Multiplying layered whispers fill the room.',
+     'Painted concept art, 2.39:1. A woman turning, unnerved, in a warm cabin as a name seems to come from the walls themselves, the light beginning to destabilise. Cinematic, oversaturated, tense.'],
+    ['act4','7.02','SC7 · INT','CU','HANDHELD','amber',
+     'She stands, searching for a source she will not find. Her composure finally goes. The narration stops. The amber does not flicker back this time — it peels.',
+     '','',
+     'Whispers crest; tinnitus; then the V.O. is gone.',
+     'Painted concept art, 2.39:1. CU of a woman composure shattering, fear breaking through trained calm, warm amber light visibly peeling toward cold blue at the edges. Photoreal, oversaturated.'],
+    ['act4','7.03','SC7 · INT','MS','STATIC','blue',
+     'REVEAL — a younger woman. Human, unmistakably her, before. A pen forced into her hand, signing a form she is not fully reading. No on-screen text — just her face: tired, vulnerable, signing anyway.',
+     '','',
+     'Pen scratch; sterile room tone.',
+     'Painted concept art, 2.39:1. A younger version of the blonde woman, human and tired, made to sign a document under cold clinical blue light, a vulnerable expression. Photoreal, deep skin texture, oversaturated.'],
+    ['act4','7.04','SC7 · INT','WS','STATIC','blue',
+     'REVEAL — the same woman on a table, restrained. Not tortured — medically prepared. Hands working at her calmly. A procedure.',
+     '','',
+     'Clinical clicks, soft machinery, breath.',
+     'Painted concept art, 2.39:1. A woman restrained on a clinical table being medically prepared by calm gloved hands under cold blue surgical light, sterile and dehumanising. Photoreal, oversaturated, dread.'],
+    ['act4','7.05','SC7 · INT','EWS','STATIC','blue',
+     'REVEAL — the thing she became, in the sky over Ventura. Her body, unfolded, vast, doing to the world below exactly what the blue pulse did to the ship. The radial burns open in real time.',
+     '','',
+     'Vast silent power; sub-bass; the world tearing.',
+     'Painted concept art, 2.39:1. EWS of a colossal body-horror biomechanical entity — distorted human flesh fused and unfolded around vast alloy mechanism, half its face metal — suspended over a planet, carving glowing radial burns into the crust. Photoreal, Secret Level grade, oversaturated, terrifying scale.'],
+    ['act4','7.06','SC7 · INT','WS','STATIC','void',
+     'REVEAL — ships approaching, one after another across years. Some armed, some not, some hostile. Each met by the same silent blue pulse. Each added to the ring.',
+     '','',
+     'Repeating silent pulses; time compressing.',
+     'Painted concept art, 2.39:1. A montage-feel single frame of multiple ships approaching a station across years, each caught in a silent blue pulse and breaking apart, above a dead planet. Cold, tragic, photoreal, oversaturated.'],
+    ['act4','7.07','SC7 · INT','EWS','STATIC','void',
+     'REVEAL — the ring itself, whole for the first time: dozens of wrecks in slow orbit around the dead world. A graveyard she built and mistook herself for the keeper of. Cuts spike to white—',
+     '','',
+     'Silence; then a rising white-out roar.',
+     'Painted concept art, 2.39:1. EWS of dozens of wrecked ships in a slow orbital ring around a dead scarred planet, a vast graveyard, cold starlight, a small station among them. Awe and grief, photoreal, oversaturated.'],
+    ['act4','8.01','SC8 · INSERT','ECU','STATIC · SUSTAINED','white',
+     'A single sustained shot. One eye, extreme close-up. Bloodshot. Wet. Human — still, against everything else, human. She has seen all of it.',
+     '','',
+     'Ringing decays to a single held tone; her breath.',
+     'Painted concept art, 2.39:1. ECU of a single bloodshot, wet human eye reflecting cold and warm light, raw and devastated. Hyper-real skin and moisture detail, oversaturated, intimate.'],
+
+    ['coda','9.01','SC9 · EXT','WS → EWS','LONG PULL BACK','void',
+     'The camera withdraws through the viewport, past the array and its blue pulse, until the station is a single warm-lit speck — and the whole debris field resolves around it. The newest fragments still settling.',
+     'KEEPER (V.O.)','',
+     'Hum recedes; beacon pulse; vast quiet.',
+     'Painted concept art, 2.39:1. A slow pull-back revealing a tiny warm-lit station as one speck within a huge ring of wrecked ships orbiting a dead planet. Epic, lonely, photoreal, oversaturated.'],
+    ['coda','10.01','SC10 · INT','MS','STATIC','amber',
+     'As the camera pulls, the fantasy reassembles — like a sheet drawn over a bed. Blue drains, amber comes up warm. The plant is green again. The record is paper no longer. Her face composes; the shaking hand stills.',
+     '','',
+     'Whispers fade; warm hum restores.',
+     'Painted concept art, 2.39:1. A station cabin healing from cold blue back to warm amber — a dead plant turning green again, a woman face recomposing into calm. Bittersweet, photoreal, oversaturated.'],
+    ['coda','10.02','SC10 · INT','CU','SLOW PUSH','amber',
+     'She settles, squares her collar, lifts the recorder, and looks directly into the lens — breathing hard, eyes still wet, the only tell that any of it happened.',
+     'KEEPER (V.O.)','Year ninety-five. Day two hundred and fifty-eight.',
+     'Recorder click; her uneven breath.',
+     'Painted concept art, 2.39:1. CU of the blonde woman looking directly into camera in warm amber light, composed but breathing hard with wet eyes, realistic skin. Haunting, cinematic, oversaturated.'],
+    ['coda','10.03','SC10 · INT','CU','STATIC · STROBE','blue',
+     'In the last instant before black, the image strobes — her composed human face, then the abomination beneath, then her face, then the thing — and cuts.',
+     '','',
+     'Strobe stabs; hard cut to silence.',
+     'Painted concept art, 2.39:1. A strobing double-exposure flicker between a calm human blonde woman face and the half-alloy body-horror abomination beneath it, warm amber and cold blue alternating. Photoreal, disturbing, oversaturated.'],
+    ['coda','10.04','CODA','—','FADE OUT','black',
+     'Over black, even and at peace. The beacon pulses once — calm, steady, patient. Fade out.',
+     'KEEPER (V.O.)','Another day in paradise.',
+     'Black. One soft beacon tone. Silence.',
+     'End card. Pure black with a single distant blue beacon pulse and a faint amber edge glow. Minimal, calm, cinematic. Type: "END — EPISODE 01".']
+  ];
+
+  var perSection = {};
+  window.DEFAULT_PANELS = raw.map(function(r){
+    var section = r[0];
+    perSection[section] = (perSection[section]||0) + 1;
+    return {
+      id: 'p-' + r[1].replace('.', '-'),
+      section: section,
+      order: perSection[section] * 10,
+      code: r[1], scene: r[2], framing: r[3], camera: r[4], mode: r[5],
+      action: r[6], diaTag: r[7], diaLine: r[8], sound: r[9], prompt: r[10],
+      status: 'todo', comments: []
+    };
+  });
+})();
+</script>
+
+<!-- App -->
+<script type="text/babel" data-presets="react-classic">
+const { useState, useEffect, useRef, useCallback } = React;
+const store = window.KeeperStore;
+const MODES = window.MODES;
+const SECTIONS = window.SECTIONS;
+
+const STATUS = {
+  todo:      { label:'TO DO',      hex:'#9AA3AD', bg:'#1c1f23' },
+  approved:  { label:'APPROVED',   hex:'#5FCF8E', bg:'#13241a' },
+  needswork: { label:'NEEDS WORK', hex:'#E8804C', bg:'#2a1c12' }
+};
+const STATUS_CYCLE = ['todo','approved','needswork'];
+
+function ago(ts){
+  const s = (Date.now() - ts) / 1000;
+  if(s < 60) return 'just now';
+  const m = s/60; if(m < 60) return Math.floor(m)+'m ago';
+  const h = m/60; if(h < 24) return Math.floor(h)+'h ago';
+  return Math.floor(h/24)+'d ago';
+}
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+
+function useAuthor(){
+  const [name, setName] = useState(() => localStorage.getItem('keeper-author') || '');
+  const save = (n) => { localStorage.setItem('keeper-author', n); setName(n); };
+  return [name, save];
+}
+
+// Auto-growing textarea that only accepts remote updates while unfocused (no cursor jump)
+function EditableText({ value, onCommit, style, placeholder }){
+  const [val, setVal] = useState(value || '');
+  const focused = useRef(false);
+  const ref = useRef(null);
+  useEffect(() => { if(!focused.current) setVal(value || ''); }, [value]);
+  useEffect(() => { const el = ref.current; if(el){ el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }, [val]);
+  return (
+    <textarea
+      ref={ref} className="edit" rows={1} value={val} placeholder={placeholder}
+      onFocus={() => { focused.current = true; }}
+      onBlur={() => { focused.current = false; if((value || '') !== val) onCommit(val); }}
+      onChange={(e) => setVal(e.target.value)}
+      style={style}
+    />
+  );
+}
+
+function Chip({ value, onCommit }){
+  const [val, setVal] = useState(value || '');
+  const focused = useRef(false);
+  useEffect(() => { if(!focused.current) setVal(value || ''); }, [value]);
+  return (
+    <input className="chip" value={val}
+      onFocus={() => focused.current = true}
+      onBlur={() => { focused.current = false; if((value||'') !== val) onCommit(val); }}
+      onChange={(e) => setVal(e.target.value)} />
+  );
+}
+
+function ImageArea({ panel }){
+  const [drag, setDrag] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef(null);
+
+  const handleFiles = async (files) => {
+    const file = [...files].find(f => f.type.startsWith('image/'));
+    if(!file) return;
+    setBusy(true);
+    try { const url = await window.fileToDataURL(file); await store.update(panel.id, { image: url }); }
+    catch(e){ alert('Could not read that image.'); }
+    setBusy(false);
+  };
+
+  return (
+    <div
+      className={'imgwrap' + (drag ? ' drag' : '')}
+      onClick={() => fileRef.current && fileRef.current.click()}
+      onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+      onDragLeave={() => setDrag(false)}
+      onDrop={(e) => { e.preventDefault(); setDrag(false); handleFiles(e.dataTransfer.files); }}
+    >
+      {panel.image
+        ? <img src={panel.image} alt={panel.code} />
+        : <div className="imghint">{busy ? 'PROCESSING…' : ('DROP / CLICK TO ADD FRAME · ' + panel.code)}</div>}
+      <input ref={fileRef} type="file" accept="image/*" style={{ display:'none' }}
+        onChange={(e) => handleFiles(e.target.files)} />
+      <div className="mono" style={{ position:'absolute', top:11, left:11, fontSize:12, fontWeight:500, letterSpacing:'.06em', color:'#fff', background:'rgba(8,6,4,0.72)', backdropFilter:'blur(3px)', padding:'5px 9px', borderRadius:3 }}>{panel.code}</div>
+      {panel.image &&
+        <div className="imgtools" onClick={(e) => e.stopPropagation()}>
+          <button className="imgbtn" onClick={() => fileRef.current.click()}>REPLACE</button>
+          <button className="imgbtn" onClick={() => store.update(panel.id, { image: null })}>REMOVE</button>
+        </div>}
+    </div>
+  );
+}
+
+function Comments({ panel, author, requireName }){
+  const [text, setText] = useState('');
+  const list = panel.comments || [];
+  const post = () => {
+    const t = text.trim(); if(!t) return;
+    if(!author){ requireName(); return; }
+    store.addComment(panel.id, { id: uid(), text: t, author, ts: Date.now() });
+    setText('');
+  };
+  return (
+    <details className="cmt" style={{ borderTop:'1px solid #241e16', paddingTop:11 }}>
+      <summary className="mono" style={{ fontSize:10.5, letterSpacing:'.12em', color:'#8f8775', display:'flex', alignItems:'center', gap:7 }}>
+        <span style={{ color:'#5FA8E6' }}>❝</span> COMMENTS {list.length ? '· ' + list.length : ''}
+      </summary>
+      <div style={{ marginTop:11, display:'flex', flexDirection:'column', gap:9 }}>
+        {list.map(c => (
+          <div key={c.id} style={{ fontSize:13, lineHeight:1.45, color:'#CFC8B9', background:'#0f0c08', border:'1px solid #241e16', borderRadius:5, padding:'8px 10px' }}>
+            <div className="mono" style={{ fontSize:10, letterSpacing:'.08em', color:'#6e6757', marginBottom:4, display:'flex', justifyContent:'space-between' }}>
+              <span style={{ color:'#5FA8E6' }}>{c.author || 'anon'}</span><span>{ago(c.ts)}</span>
+            </div>
+            {c.text}
+          </div>
+        ))}
+        <div style={{ display:'flex', gap:7 }}>
+          <input className="chip" style={{ flex:1, fontFamily:"'Archivo',sans-serif", fontSize:13, letterSpacing:0, color:'#E8E2D6', padding:'7px 9px' }}
+            placeholder={author ? 'Add a comment…' : 'Set your name above to comment'}
+            value={text} onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => { if(e.key === 'Enter') post(); }} />
+          <button className="imgbtn" style={{ background:'#1f2733', borderColor:'#2d4254' }} onClick={post}>POST</button>
+        </div>
+      </div>
+    </details>
+  );
+}
+
+function Panel({ panel, siblings, author, requireName }){
+  const mode = MODES[panel.mode] || MODES.void;
+  const st = STATUS[panel.status] || STATUS.todo;
+  const idx = siblings.findIndex(p => p.id === panel.id);
+  const set = (patch) => store.update(panel.id, patch);
+
+  const move = (dir) => {
+    const target = siblings[idx + dir];
+    if(!target) return;
+    const a = panel.order, b = target.order;
+    store.update(panel.id, { order: b });
+    store.update(target.id, { order: a });
+  };
+  const cycleStatus = () => {
+    const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(panel.status) + 1) % STATUS_CYCLE.length];
+    set({ status: next });
+  };
+  const del = () => { if(confirm('Delete panel ' + panel.code + '?')) store.remove(panel.id); };
+
+  return (
+    <div className="card">
+      <div style={{ height:4, width:'100%', background:mode.hex }}></div>
+      <ImageArea panel={panel} />
+
+      <div style={{ padding:'14px 18px 18px', display:'flex', flexDirection:'column', gap:13, flex:1 }}>
+        {/* control row */}
+        <div style={{ display:'flex', alignItems:'center', gap:7 }}>
+          <button onClick={cycleStatus} className="mono" title="Click to change status"
+            style={{ fontSize:10, letterSpacing:'.1em', padding:'5px 10px', borderRadius:4, cursor:'pointer', background:st.bg, color:st.hex, border:'1px solid '+st.hex+'66' }}>
+            ● {st.label}
+          </button>
+          <select value={panel.mode} onChange={(e) => set({ mode: e.target.value })} className="mono"
+            style={{ fontSize:10, letterSpacing:'.08em', padding:'5px 8px', borderRadius:4, background:'#1b1610', color:mode.hex, border:'1px solid '+mode.hex+'55', cursor:'pointer' }}>
+            {Object.keys(MODES).map(k => <option key={k} value={k} style={{ background:'#15110c', color:'#E8E2D6' }}>{MODES[k].label}</option>)}
+          </select>
+          <div style={{ marginLeft:'auto', display:'flex', gap:5 }}>
+            <button className="iconbtn" title="Move up"   onClick={() => move(-1)} disabled={idx === 0}>▲</button>
+            <button className="iconbtn" title="Move down" onClick={() => move(1)} disabled={idx === siblings.length - 1}>▼</button>
+            <button className="iconbtn" title="Delete panel" onClick={del} style={{ color:'#C97A5A' }}>✕</button>
+          </div>
+        </div>
+
+        {/* meta chips */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:7 }}>
+          <Chip value={panel.scene}   onCommit={(v) => set({ scene: v })} />
+          <Chip value={panel.framing} onCommit={(v) => set({ framing: v })} />
+          <Chip value={panel.camera}  onCommit={(v) => set({ camera: v })} />
+        </div>
+
+        {/* action */}
+        <EditableText value={panel.action} onCommit={(v) => set({ action: v })} placeholder="Action / staging…"
+          style={{ fontSize:14.5, lineHeight:1.55, color:'#D8D1C3' }} />
+
+        {/* dialogue */}
+        <div style={{ borderLeft:'3px solid #E8A24C', background:'linear-gradient(90deg,rgba(232,162,76,0.10),rgba(232,162,76,0.02))', padding:'8px 12px', borderRadius:'0 4px 4px 0' }}>
+          <Chip value={panel.diaTag} onCommit={(v) => set({ diaTag: v })} />
+          <div style={{ height:6 }}></div>
+          <EditableText value={panel.diaLine} onCommit={(v) => set({ diaLine: v })} placeholder="Dialogue / V.O. (leave blank if none)…"
+            style={{ fontSize:14, lineHeight:1.5, color:'#EDE6D8', fontStyle:'italic' }} />
+        </div>
+
+        {/* sound */}
+        <div style={{ display:'flex', gap:9, alignItems:'flex-start' }}>
+          <span className="mono" style={{ color:'#5a5346', flexShrink:0, letterSpacing:'.08em', fontSize:11.5, paddingTop:3 }}>SND</span>
+          <EditableText value={panel.sound} onCommit={(v) => set({ sound: v })} placeholder="Sound design…"
+            style={{ fontFamily:"'IBM Plex Mono',monospace", fontSize:11.5, lineHeight:1.5, color:'#8f8775' }} />
+        </div>
+
+        {/* prompt */}
+        <div style={{ padding:'11px 13px', background:'#0f0c08', border:'1px solid #241e16', borderRadius:5 }}>
+          <div className="mono" style={{ fontSize:9.5, letterSpacing:'.18em', color:'#5a5346', marginBottom:6, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <span>▸ GENERATION PROMPT</span>
+            <button className="imgbtn" style={{ padding:'3px 7px' }} onClick={() => { navigator.clipboard && navigator.clipboard.writeText(panel.prompt || ''); }}>COPY</button>
+          </div>
+          <EditableText value={panel.prompt} onCommit={(v) => set({ prompt: v })} placeholder="Generation prompt…"
+            style={{ fontFamily:"'IBM Plex Mono',monospace", fontSize:11.5, lineHeight:1.55, color:'#B6AE9C' }} />
+        </div>
+
+        <Comments panel={panel} author={author} requireName={requireName} />
+      </div>
+    </div>
+  );
+}
+
+function App(){
+  const [panels, setPanels] = useState(null);
+  const [author, setAuthor] = useAuthor();
+  const [nameDraft, setNameDraft] = useState('');
+  const live = store.mode === 'live';
+
+  useEffect(() => {
+    let unsub = () => {};
+    store.seedIfEmpty(window.DEFAULT_PANELS).then(() => {
+      unsub = store.subscribe(setPanels);
+    });
+    return () => unsub();
+  }, []);
+
+  const requireName = () => { const n = prompt('Enter a display name for your comments:'); if(n) setAuthor(n.trim()); };
+
+  const addPanel = (section) => {
+    const inSec = (panels || []).filter(p => p.section === section);
+    const maxOrder = inSec.reduce((m, p) => Math.max(m, p.order || 0), 0);
+    const def = SECTIONS.find(s => s.id === section);
+    store.add({
+      id: 'p-' + uid(), section, order: maxOrder + 10,
+      code: 'NEW', scene: '', framing: '', camera: 'STATIC', mode: def ? def.defMode : 'amber',
+      action: '', diaTag: '', diaLine: '', sound: '', prompt: '', status: 'todo', comments: []
+    });
+  };
+
+  if(!panels) return (
+    <div className="wrap mono" style={{ color:'#8c8474', paddingTop:120, textAlign:'center', letterSpacing:'.2em' }}>LOADING BOARD…</div>
+  );
+
+  const filled = panels.filter(p => p.image).length;
+  const approved = panels.filter(p => p.status === 'approved').length;
+
+  return (
+    <div className="wrap">
+      <header style={{ borderBottom:'1px solid #2c251b', paddingBottom:34, marginBottom:8 }}>
+        <div className="mono" style={{ display:'flex', alignItems:'center', gap:12, fontSize:12, letterSpacing:'.22em', color:'#8c8474', textTransform:'uppercase', marginBottom:18, flexWrap:'wrap' }}>
+          <span style={{ color:'#E8A24C' }}>●</span>
+          <span>Episode 01 — Live Storyboard</span>
+          <span style={{ color:'#4a4136' }}>/</span>
+          <span style={{ color: live ? '#5FCF8E' : '#E8804C' }}>{live ? 'LIVE · SYNCED' : 'DEMO MODE · LOCAL'}</span>
+        </div>
+        <h1 style={{ fontSize:64, fontWeight:800, letterSpacing:'-0.02em', lineHeight:0.92, margin:'0 0 18px', textTransform:'uppercase' }}>The Keeper</h1>
+
+        <div style={{ display:'flex', gap:'10px 26px', flexWrap:'wrap', alignItems:'center' }}>
+          <div className="mono" style={{ fontSize:12, color:'#A39A88', display:'flex', gap:18, flexWrap:'wrap' }}>
+            <span>{panels.length} PANELS</span>
+            <span>{filled} FRAMES IN</span>
+            <span>{approved} APPROVED</span>
+          </div>
+          <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:8 }}>
+            <span className="mono" style={{ fontSize:11, color:'#6e6757', letterSpacing:'.1em' }}>YOU:</span>
+            <input className="chip" style={{ fontFamily:"'Archivo',sans-serif", fontSize:13, color:'#E8E2D6', padding:'6px 10px', width:160 }}
+              placeholder="your name" value={author || nameDraft}
+              onChange={(e) => { setNameDraft(e.target.value); setAuthor(e.target.value); }} />
+          </div>
+        </div>
+      </header>
+
+      {!live &&
+        <div className="banner" style={{ marginTop:30 }}>
+          <span style={{ fontSize:18 }}>🛈</span>
+          <div style={{ fontSize:13.5, lineHeight:1.55, color:'#Bcd0e0' }}>
+            <strong style={{ color:'#9CC6EC' }}>Demo mode.</strong> Every change saves to this browser only — open a second tab to watch live sync locally.
+            To make it a shared link your whole team edits together, paste your Firebase keys into <span className="mono" style={{ color:'#E8E2D6' }}>index.html</span> (see <span className="mono">SETUP.md</span>). The app flips to live automatically.
+          </div>
+        </div>}
+      {live &&
+        <div className="banner live" style={{ marginTop:30 }}>
+          <span style={{ fontSize:18 }}>✓</span>
+          <div style={{ fontSize:13.5, lineHeight:1.55, color:'#A8D9BE' }}>
+            <strong style={{ color:'#7FE3A6' }}>Live & synced.</strong> Everyone with this URL edits the same board in real time. Changes appear within a second.
+          </div>
+        </div>}
+
+      {SECTIONS.map(sec => {
+        const sp = panels.filter(p => p.section === sec.id);
+        return (
+          <section key={sec.id} style={{ marginTop:56 }}>
+            <div style={{ display:'flex', alignItems:'baseline', gap:16, marginBottom:24, paddingBottom:14, borderBottom:'1px solid #2c251b', flexWrap:'wrap' }}>
+              <div className="mono" style={{ fontSize:13, letterSpacing:'.18em', color:'#E8A24C' }}>{sec.kicker}</div>
+              <h2 style={{ fontSize:26, fontWeight:700, letterSpacing:'-0.01em', margin:0 }}>{sec.title}</h2>
+              <div className="mono" style={{ fontSize:12, color:'#6e6757', marginLeft:'auto' }}>{sec.scenes}</div>
+            </div>
+            <div className="grid">
+              {sp.map(p => <Panel key={p.id} panel={p} siblings={sp} author={author} requireName={requireName} />)}
+            </div>
+            <button onClick={() => addPanel(sec.id)} className="mono"
+              style={{ marginTop:18, fontSize:11.5, letterSpacing:'.1em', color:'#8c8474', background:'transparent', border:'1px dashed #3a3225', borderRadius:6, padding:'12px 18px', cursor:'pointer' }}>
+              + ADD PANEL TO {sec.title.toUpperCase()}
+            </button>
+          </section>
+        );
+      })}
+
+      <footer className="mono" style={{ marginTop:72, paddingTop:28, borderTop:'1px solid #2c251b', fontSize:11, letterSpacing:'.1em', color:'#5a5346', display:'flex', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
+        <span>THE KEEPER — EPISODE 01 — LIVE STORYBOARD</span>
+        <span>{live ? 'FIRESTORE-SYNCED' : 'LOCAL DEMO'} · {panels.length} PANELS</span>
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
