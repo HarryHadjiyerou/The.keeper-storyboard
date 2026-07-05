@@ -1825,6 +1825,7 @@ function buildGltfVeh(def){
     if(RIDER_TPL){
       rider=new THREE.Group();
       var ch=RIDER_TPL.clone();
+      ch.rotation.y=Math.PI; // face down the road
       ch.traverse(function(n){if(/weapon/i.test(n.name||''))n.visible=false;});
       ch.scale.multiplyScalar(0.66);
       ch.position.set(0,-0.3,0.05); // hips at the seat pivot, boots tucked into the flanks
@@ -1837,7 +1838,8 @@ function buildGltfVeh(def){
     g.add(rider);
   }
   return {g:g,spins:spins,spinR:0.42,exGlows:[exGlow],rider:rider,
-    riderPose:cfg.rider?(RIDER_TPL?cfg.rider.pose*0.6:cfg.rider.pose):0.5,squash:0.3,hover:cfg.hover||0,
+    riderPose:cfg.rider?(RIDER_TPL?-cfg.rider.pose*0.6:cfg.rider.pose):0.5,
+    riderSign:(cfg.rider&&RIDER_TPL)?-1:1,squash:0.3,hover:cfg.hover||0,
     lampY:Math.min(0.75,t.h*0.45),lampZ:-t.len/2+0.04};
 }
 function prepNpc(root){
@@ -2510,7 +2512,7 @@ function updBike(dt){
   bike.rotation.z=-S.lean;
   bike.rotation.y=-S.lean*0.35;
   bike.scale.y=1-(VEH.squash||0.38)*S.slF;
-  if(VEH.rider)VEH.rider.rotation.x=(VEH.riderPose!==undefined?VEH.riderPose:0.82)+0.6*S.slF;
+  if(VEH.rider)VEH.rider.rotation.x=(VEH.riderPose!==undefined?VEH.riderPose:0.82)+(VEH.riderSign||1)*0.6*S.slF;
   var om=S.eff/(VEH.spinR||0.38);
   for(var i=0;i<VEH.spins.length;i++){
     var sp=VEH.spins[i];
