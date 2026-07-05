@@ -28,7 +28,8 @@ Open `index.html` from any static web server (or GitHub Pages). No build step.
 
   | Vehicle | Type | Price |
   |---|---|---|
-  | VOLT RUNNER | balanced street bike | free |
+  | VOLT RUNNER | rebel concept bike (balanced) | free |
+  | DRIFTER | street cruiser | 250 ◆ |
   | KATANA ZX | fast, agile, fragile superbike | 450 ◆ |
   | RONIN GT | armored muscle coupe | 1,000 ◆ |
   | SPECTRE X | fastest; gravlift hoverbike | 1,800 ◆ |
@@ -41,9 +42,19 @@ Open `index.html` from any static web server (or GitHub Pages). No build step.
 
 ## Asset credits
 
+- VOLT RUNNER: "Audi Rebel F1" concept bike — free Sketchfab download (add author credit here)
+- Enemy chase car: "2058 Quadra Turbo-R V-Tech" — free Sketchfab download (add author credit here)
+- KATANA ZX: "Motorcycle concept sketch" — free Sketchfab download (add author credit here)
+- SPECTRE X: "Hoverbike post-apocalypse" — free Sketchfab download (add author credit here)
+- Garage character: "Empire of Future" — free Sketchfab download (add author credit here)
+- DRIFTER: "Motorcycle" by [Poly by Google](https://poly.pizza/u/Poly%20by%20Google) — CC-BY, via Poly Pizza
 - Traffic & police cars: [Quaternius](https://poly.pizza/u/Quaternius) — CC0 (public domain), via Poly Pizza
-- VOLT RUNNER motorcycle: "Motorcycle" by [Poly by Google](https://poly.pizza/u/Poly%20by%20Google) — CC-BY, via Poly Pizza
-- All other vehicles, the rider, city and effects are procedurally generated in code
+- Remaining vehicles, the rider, city and effects are procedurally generated in code
+
+> Note: most free Sketchfab downloads are CC-BY — fill in each author's name above
+> (from the model's Sketchfab page) before public release. Trademarked designs
+> (Audi, the Cyberpunk 2077 Quadra) are fine for prototyping but should be
+> replaced or renamed before an App Store / Play Store release.
 
 ## Development
 
