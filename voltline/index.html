@@ -1766,7 +1766,7 @@ function mkCar(kind){
 ['sedan','sedan','sedan','sedan','taxi','taxi','van','van','sport','sport','sedan','taxi','sport','sedan'].forEach(mkCar);
 
 /* glTF car bodies (CC0 by Quaternius) — dress pool cars once templates load */
-var CAR_TPL={},VEH_TPL={},QUADRA_TPL=null,npcObj=null,npcLoading=false;
+var CAR_TPL={},VEH_TPL={},QUADRA_TPL=null,RIDER_TPL=null;
 var GLTF_VEH={
   volt:   {file:'models/volt_rebel.glb',   len:2.9, rider:{yf:0.6, z:0.12, pose:0.5}},
   drifter:{file:'models/moto5.glb',        len:2.7, rider:{yf:0.7, z:0.22, pose:0.55}},
@@ -1806,12 +1806,22 @@ function buildGltfVeh(def){
   exGlow.position.set(0.12,0.38,t.len/2-0.15);g.add(exGlow);
   var rider=null;
   if(cfg.rider){
-    rider=buildRider2(acc);
-    rider.position.set(0,t.h*cfg.rider.yf,cfg.rider.z);
+    if(RIDER_TPL){
+      rider=new THREE.Group();
+      var ch=RIDER_TPL.clone();
+      ch.traverse(function(n){if(/weapon/i.test(n.name||''))n.visible=false;});
+      ch.scale.multiplyScalar(0.66);
+      ch.position.set(0,-0.3,0.05); // hips at the seat pivot, boots tucked into the flanks
+      rider.add(ch);
+      rider.position.set(0,t.h*cfg.rider.yf+0.16,cfg.rider.z);
+    }else{
+      rider=buildRider2(acc);
+      rider.position.set(0,t.h*cfg.rider.yf,cfg.rider.z);
+    }
     g.add(rider);
   }
   return {g:g,spins:spins,spinR:0.42,exGlows:[exGlow],rider:rider,
-    riderPose:cfg.rider?cfg.rider.pose:0.5,squash:0.3,hover:cfg.hover||0,
+    riderPose:cfg.rider?(RIDER_TPL?cfg.rider.pose*0.6:cfg.rider.pose):0.5,squash:0.3,hover:cfg.hover||0,
     lampY:Math.min(0.75,t.h*0.45),lampZ:-t.len/2+0.04};
 }
 function prepNpc(root){
@@ -1824,17 +1834,7 @@ function prepNpc(root){
   root.position.x-=c.x;root.position.z-=c.z;root.position.y-=box.min.y;
   return holder;
 }
-function loadNpc(){ // garage-only prop, lazy-loaded on first garage visit
-  if(npcObj||npcLoading||!THREE.GLTFLoader)return;
-  npcLoading=true;
-  new THREE.GLTFLoader().load('models/npc.glb',function(res){
-    npcObj=prepNpc(res.scene);
-    npcObj.position.set(1.7,0.02,1.15);
-    npcObj.rotation.y=-2.3;
-    npcObj.visible=(mode==='garage');
-    scene.add(npcObj);
-  },undefined,function(){npcLoading=false;});
-}
+
 function prepTemplate(root,kk){
   var holder=new THREE.Group();holder.add(root);
   var box=new THREE.Box3().setFromObject(holder);
@@ -1876,6 +1876,10 @@ if(THREE.GLTFLoader)(function(){
     QUADRA_TPL=prepBikeTemplate(res.scene,3.6);
     upgradeCop();
   },undefined,function(){/* procedural cop fallback */});
+  L.load('models/npc.glb',function(res){ // the main character
+    RIDER_TPL=prepNpc(res.scene);
+    if(mode!=='play')setVehicle((mode==='garage')?VEHICLES[gIdx].id:SAVE.vehicle);
+  },undefined,function(){/* procedural rider fallback */});
 })();
 function dressCar(c){
   var pick=(c.kind==='sedan')?(Math.random()<0.5?'car1':'car2'):
@@ -2350,7 +2354,6 @@ function startRun(){
   $('garage').classList.add('hide');
   $('hud').classList.remove('hide');
   mode='play';musicLevel();
-  if(npcObj)npcObj.visible=false;
   intro.t=5.2;
   cop.visible=true;
   cop.position.set(S.x+1.5,0,3.4);
@@ -2369,7 +2372,6 @@ function resumeGame(){
 function toMenu(){
   clearField();
   intro.t=0;
-  if(npcObj)npcObj.visible=false;
   mode='menu';musicLevel();
   menuStats();
   $('pause').classList.add('hide');
@@ -2422,8 +2424,6 @@ function renderGarage(){
   setVehicle(v.id); // live 3D preview behind the panel
 }
 function openGarage(){
-  loadNpc();
-  if(npcObj)npcObj.visible=true;
   for(var i=0;i<VEHICLES.length;i++)if(VEHICLES[i].id===SAVE.vehicle)gIdx=i;
   mode='garage';musicLevel();
   $('menu').classList.add('hide');
