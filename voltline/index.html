@@ -1514,6 +1514,8 @@ function clearField(){
   for(var j=0;j<PICKS.length;j++){PICKS[j].active=false;PICKS[j].g.visible=false;}
   for(var k=0;k<CARS.length;k++){CARS[k].active=false;CARS[k].g.visible=false;}
   for(var k2=0;k2<OPS.length;k2++)OPS[k2].visible=false;
+  for(var k3=0;k3<GUNNERS.length;k3++){GUNNERS[k3].active=false;GUNNERS[k3].g.visible=false;}
+  for(var k4=0;k4<LASERS.length;k4++){LASERS[k4].active=false;LASERS[k4].g.visible=false;}
   endPursuit(false);pur.cool=0;
 }
 
@@ -1575,9 +1577,16 @@ function spawnRow(){
     }
     if(opLane>=0&&Math.random()<0.85)placeOp(LANE_X[opLane]+rnd(-0.5,0.5),zb+1.8);
     if(Math.random()<0.5)placeObs(pickPass(),LANE_X[open],zb-rnd(8,14));
-  }else if(tl<0&&avail('DRONEOB')&&r<0.68){
+  }else if(OP_TPL&&S.dist>600&&r<0.71){
+    var gcands=[];
+    for(var lg=0;lg<3;lg++)if(lg!==open&&lg!==tl)gcands.push(lg);
+    if(gcands.length){
+      spawnGunner(LANE_X[gcands[irnd(0,gcands.length-1)]],zb);
+      if(Math.random()<0.4)placeObs(pickPass(),LANE_X[open],zb-rnd(0,3));
+    }
+  }else if(tl<0&&avail('DRONEOB')&&r<0.75){
     placeObs('DRONEOB',0,zb);
-  }else if(tl<0&&avail('EWALL2')&&open!==1&&r<0.76){
+  }else if(tl<0&&avail('EWALL2')&&open!==1&&r<0.81){
     placeObs('EWALL2',open===0?1.5:-1.5,zb);
     if(diff>0.4&&Math.random()<0.5)placeObs(pickPass(),LANE_X[open],zb-rnd(0,3));
   }else{
@@ -1900,6 +1909,101 @@ function placeOp(x,z){
     }
   }
 }
+/* ---------------- laser gunners (dodge the straight-line bolts) ---------------- */
+var OP_TPL=null,GUNNERS=[],LASERS=[];
+(function(){
+  for(var i=0;i<3;i++){
+    var e={g:new THREE.Group(),active:false,fireT:0,dressed:false,mz:null};
+    e.g.visible=false;scene.add(e.g);
+    GUNNERS.push(e);
+  }
+  var laserMat=new THREE.MeshBasicMaterial({color:0xff2b4a,transparent:true,opacity:0.95,
+    blending:THREE.AdditiveBlending,depthWrite:false});
+  var laserGeo=new THREE.BoxGeometry(0.07,0.07,2.6);
+  for(var j=0;j<10;j++){
+    var g=new THREE.Group();
+    g.add(new THREE.Mesh(laserGeo,laserMat));
+    var s=glowSprite(0xff3b5a,0.85);g.add(s);
+    g.visible=false;scene.add(g);
+    LASERS.push({g:g,active:false,v:0});
+  }
+})();
+function dressGunner(e){
+  if(e.dressed||!OP_TPL)return;
+  var o=OP_TPL.clone();
+  o.scale.multiplyScalar(2.05);
+  e.g.add(o);
+  e.mz=glowSprite(0xff5b3a,0.7);
+  e.mz.position.set(0.12,1.15,0.6);
+  e.mz.material.opacity=0;
+  e.g.add(e.mz);
+  e.dressed=true;
+}
+function spawnGunner(x,z){
+  for(var i=0;i<GUNNERS.length;i++){
+    var e=GUNNERS[i];
+    if(e.active)continue;
+    dressGunner(e);
+    if(!e.dressed)return;
+    e.active=true;e.g.visible=true;
+    e.g.position.set(x,0.02,z);
+    e.g.rotation.y=Math.PI; // squared up, facing the oncoming player
+    e.fireT=rnd(0.3,0.8);
+    if(Math.random()<0.5)banner('&#9888; GUNNER AHEAD');
+    return;
+  }
+}
+function sfxZap(){
+  if(AU.ctx&&!SAVE.muted)envOsc(audioNow(),'square',1600,220,0.12,0.12,AU.master,'lowpass',2400);
+}
+function fireLaser(e){
+  for(var i=0;i<LASERS.length;i++){
+    var l=LASERS[i];
+    if(l.active)continue;
+    l.active=true;l.g.visible=true;
+    l.g.position.set(e.g.position.x+0.12,1.05,e.g.position.z+1.0);
+    l.v=58;
+    if(e.mz)e.mz.material.opacity=1;
+    sfxZap();
+    return;
+  }
+}
+function updGunners(dt,dz){
+  for(var i=0;i<GUNNERS.length;i++){
+    var e=GUNNERS[i];if(!e.active)continue;
+    e.g.position.z+=dz;
+    var z=e.g.position.z;
+    if(z>14){e.active=false;e.g.visible=false;continue;}
+    if(mode==='play'&&z<-18&&z>-210){
+      e.fireT-=dt;
+      if(e.fireT<=0){
+        e.fireT=rnd(0.85,1.4);
+        fireLaser(e);
+      }
+    }
+    if(e.mz&&e.mz.material.opacity>0)e.mz.material.opacity=Math.max(0,e.mz.material.opacity-5*dt);
+    if(mode==='play'&&Math.abs(z)<1.2&&Math.abs(S.x-e.g.position.x)<1.0&&(0.15+S.y)<2.0){
+      e.active=false;e.g.visible=false;
+      damage({dmg:25,g:e.g,y0:0,y1:2,hx:0.8,hz:0.6,type:'GUNNER',passable:false});
+    }
+  }
+}
+function updLasers(dt,dz){
+  for(var i=0;i<LASERS.length;i++){
+    var l=LASERS[i];if(!l.active)continue;
+    var z0=l.g.position.z,z1=z0+dz+l.v*dt;
+    l.g.position.z=z1;
+    if(z1>12){l.active=false;l.g.visible=false;continue;}
+    if(mode!=='play')continue;
+    if(z1>-1.0&&z0<1.0&&Math.abs(S.x-l.g.position.x)<0.55){
+      var loY=0.15+S.y,hiY=S.y+(S.slide>0?0.95:1.7);
+      if(1.05>loY&&1.05<hiY){ // slide under it, or clear it at the top of a jump
+        l.active=false;l.g.visible=false;
+        damage({dmg:12,g:l.g,y0:0.8,y1:1.3,hx:0.2,hz:0.5,type:'LASER',passable:true});
+      }
+    }
+  }
+}
 if(THREE.GLTFLoader)(function(){
   var L=new THREE.GLTFLoader();
   var files={car1:'models/car1.glb',car2:'models/car2.glb',suv:'models/suv.glb',
@@ -1989,6 +2093,7 @@ if(THREE.GLTFLoader)(function(){
   L.load('models/operator.glb',function(res){ // armored blockade operators
     gradeEnv(res.scene,false);
     var tpl3=unitize(res.scene);
+    OP_TPL=tpl3;
     for(var i2=0;i2<2;i2++){
       var o=tpl3.clone();
       o.scale.multiplyScalar(2.05);
@@ -2720,6 +2825,8 @@ function frame(now){
     moveWorld(dz);
     spawnTick(dz);
     updObstacles(dt,dz);
+    updGunners(dt,dz);
+    updLasers(dt,dz);
     updTraffic(dt,dz);
     updPursuit(dt);
     updPickups(dt,dz);
@@ -2789,7 +2896,7 @@ window.addEventListener('resize',function(){
 /* dev hooks — only exposed with ?debug=1 */
 if(/[?&]debug=1/.test(location.search)){
   window.__VL={
-    spawnCar:spawnCar,startPursuit:startPursuit,pursuitKill:pursuitKill,
+    spawnCar:spawnCar,startPursuit:startPursuit,pursuitKill:pursuitKill,spawnGunner:spawnGunner,GUNNERS:GUNNERS,LASERS:LASERS,
     state:function(){return S;},pur:pur,cars:CARS,cop:cop,intro:intro,
     setCredits:function(n){SAVE.credits=n;persist();menuStats();}
   };
