@@ -49,6 +49,10 @@ Open `index.html` from any static web server (or GitHub Pages). No build step.
 - Garage character: "Empire of Future" — free Sketchfab download (add author credit here)
 - DRIFTER: "Motorcycle" by [Poly by Google](https://poly.pizza/u/Poly%20by%20Google) — CC-BY, via Poly Pizza
 - Traffic & police cars: [Quaternius](https://poly.pizza/u/Quaternius) — CC0 (public domain), via Poly Pizza
+- Skyline towers: "Sci-fi buildings pack low-poly" — free Sketchfab download (add author credit here)
+- Street frontage: "Building pack" — free Sketchfab download (add author credit here)
+- Overhead gantries: "Highway modular street assets vol. 04" — free Sketchfab download (add author credit here)
+- Blockade operator: "Tactical stance cyberpunk armored operator" — free Sketchfab download (add author credit here)
 - Remaining vehicles, the rider, city and effects are procedurally generated in code
 
 > Note: most free Sketchfab downloads are CC-BY — fill in each author's name above
