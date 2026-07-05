@@ -235,6 +235,7 @@ h2{font-size:18px;font-weight:800;letter-spacing:.3em;color:#e8fbff;text-transfo
 <script src="vendor/ShaderPass.js"></script>
 <script src="vendor/UnrealBloomPass.js"></script>
 <script src="vendor/Reflector.js"></script>
+<script src="vendor/GLTFLoader.js"></script>
 <script>
 (function(){
 'use strict';
@@ -1093,56 +1094,110 @@ function addCommon(o,def){
 function buildBike(def){
   var k=(def.id==='katana');
   var g=new THREE.Group(),acc=accentMat(def.accent);
-  var fz=k?-1.08:-0.98,bz=k?0.98:0.92,fr=k?0.4:0.36,br=k?0.44:0.4;
-  var wheelF=makeWheel(fz,fr,k?acc:MAT.redhot),wheelB=makeWheel(bz,br,k?acc:MAT.redhot);
-  g.add(wheelF,wheelB,makeCowl(fz,fr),makeCowl(bz,br));
-  var spine=new THREE.Mesh(new THREE.BoxGeometry(0.34,0.28,k?1.75:1.55),MAT.body);
-  spine.position.set(0,0.66,-0.05);g.add(spine);
-  var tank=new THREE.Mesh(new THREE.SphereGeometry(0.3,18,14),MAT.gun);tank.scale.set(0.75,0.62,1.35);
-  tank.position.set(0,0.82,-0.3);tank.rotation.x=0.1;g.add(tank);
-  var fairL=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.3,1.2),MAT.gun);
-  fairL.position.set(-0.24,0.6,-0.15);fairL.rotation.z=0.32;g.add(fairL);
-  var fairR=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.3,1.2),MAT.gun);
-  fairR.position.set(0.24,0.6,-0.15);fairR.rotation.z=-0.32;g.add(fairR);
-  var skirtL=new THREE.Mesh(new THREE.BoxGeometry(0.04,0.22,1.0),MAT.carbon);
-  skirtL.position.set(-0.27,0.4,0.05);skirtL.rotation.z=-0.45;g.add(skirtL);
-  var skirtR=new THREE.Mesh(new THREE.BoxGeometry(0.04,0.22,1.0),MAT.carbon);
-  skirtR.position.set(0.27,0.4,0.05);skirtR.rotation.z=0.45;g.add(skirtR);
-  var noseW=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,k?0.85:0.62,k?4:3),MAT.body);
-  noseW.rotation.x=Math.PI/2;noseW.scale.set(0.72,1,0.55);
-  noseW.position.set(0,0.58,k?-1.42:-1.3);g.add(noseW);
-  var lamp=new THREE.Mesh(new THREE.BoxGeometry(0.2,0.05,0.04),
-    new THREE.MeshBasicMaterial({color:0xcfefff}));
-  lamp.position.set(0,0.6,k?-1.7:-1.58);g.add(lamp);
-  var bars=new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.025,0.52,8),MAT.gun);
-  bars.rotation.z=Math.PI/2;bars.position.set(0,0.94,-0.78);g.add(bars);
-  var tailW=new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.22,0.5,k?4:3),MAT.body);
-  tailW.rotation.x=Math.PI/2;tailW.rotation.z=Math.PI;tailW.scale.set(0.8,1,0.6);
-  tailW.position.set(0,0.8,0.95);g.add(tailW);
-  var tailLight=new THREE.Mesh(new THREE.BoxGeometry(0.34,0.06,0.03),MAT.redhot);
-  tailLight.position.set(0,0.82,1.2);g.add(tailLight);
-  var spineGlow=new THREE.Mesh(new THREE.BoxGeometry(0.03,0.02,0.95),MAT.redhot);
-  spineGlow.position.set(0,0.84,0.5);g.add(spineGlow);
-  var stripGeo=new THREE.BoxGeometry(0.02,0.03,1.5);
-  var stripL=new THREE.Mesh(stripGeo,acc);stripL.position.set(-0.18,0.82,-0.05);g.add(stripL);
-  var stripR=new THREE.Mesh(stripGeo,acc);stripR.position.set(0.18,0.82,-0.05);g.add(stripR);
-  if(k){ // katana: dorsal blade fin
-    var fin=new THREE.Mesh(new THREE.BoxGeometry(0.035,0.34,0.9),MAT.body);
-    fin.position.set(0,1.0,0.55);fin.rotation.x=-0.28;g.add(fin);
-    var finE=new THREE.Mesh(new THREE.BoxGeometry(0.015,0.36,0.05),acc);
-    finE.position.set(0,1.02,0.95);finE.rotation.x=-0.28;g.add(finE);
+  var hullMat=new THREE.MeshStandardMaterial({color:0x0d0e16,metalness:0.92,roughness:0.18});
+  var darkMat=new THREE.MeshStandardMaterial({color:0x07080c,metalness:0.85,roughness:0.42});
+  function discWheel(z,r){ // solid disc wheel with glowing rim ring
+    var w=new THREE.Group(),spin=new THREE.Group();
+    spin.add(new THREE.Mesh(new THREE.TorusGeometry(r,0.085,14,36),darkMat));
+    var disc=new THREE.Mesh(new THREE.CylinderGeometry(r-0.03,r-0.03,0.09,28),hullMat);
+    disc.rotation.x=Math.PI/2;spin.add(disc);
+    spin.add(new THREE.Mesh(new THREE.TorusGeometry(r-0.1,0.014,8,36),k?acc:MAT.redhot));
+    var hub=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.11,16),acc);
+    hub.rotation.x=Math.PI/2;spin.add(hub);
+    w.add(spin);w.rotation.y=Math.PI/2;w.position.set(0,r,z);
+    w.userData.spin=spin;return w;
   }
-  var screen=new THREE.Mesh(new THREE.PlaneGeometry(0.32,0.26),MAT.addCyan.clone());
-  screen.material.color.setHex(0xffb54a);screen.material.opacity=0.3;
-  screen.position.set(0,0.92,-0.62);screen.rotation.x=-0.55;g.add(screen);
-  var exG=new THREE.CylinderGeometry(0.055,0.075,0.3,8);
-  var exL=new THREE.Mesh(exG,MAT.gun);exL.rotation.x=Math.PI/2;exL.position.set(-0.14,0.52,1.2);g.add(exL);
-  var exR=new THREE.Mesh(exG,MAT.gun);exR.rotation.x=Math.PI/2;exR.position.set(0.14,0.52,1.2);g.add(exR);
-  var exGlowL=glowSprite(0xff8a2a,0.5);exGlowL.position.set(-0.14,0.52,1.38);g.add(exGlowL);
-  var exGlowR=glowSprite(0xff8a2a,0.5);exGlowR.position.set(0.14,0.52,1.38);g.add(exGlowR);
-  var rider=buildRider(acc);g.add(rider);
-  return {g:g,spins:[{n:wheelF.userData.spin,ax:'z'},{n:wheelB.userData.spin,ax:'z'}],
-    spinR:0.38,exGlows:[exGlowL,exGlowR],rider:rider,squash:0.38,hover:0,lampY:0.6,lampZ:k?-1.72:-1.6};
+  var wF=discWheel(k?-1.1:-1.02,0.37),wB=discWheel(0.95,0.42);
+  g.add(wF,wB);
+  function cowl(z,r){
+    var arc=Math.PI*1.15;
+    var m=new THREE.Mesh(new THREE.TorusGeometry(r+0.06,0.07,12,28,arc),hullMat);
+    m.rotation.z=Math.PI/2-arc/2;
+    var gg=new THREE.Group();gg.add(m);
+    gg.rotation.y=Math.PI/2;gg.position.set(0,r,z);return gg;
+  }
+  g.add(cowl(k?-1.1:-1.02,0.37),cowl(0.95,0.42));
+  // sculpted hull — smooth overlapping shells
+  var nose=new THREE.Mesh(new THREE.SphereGeometry(0.3,24,18),hullMat);
+  nose.scale.set(k?0.5:0.62,0.5,k?1.85:1.55);nose.position.set(0,0.62,-1.0);g.add(nose);
+  var tank=new THREE.Mesh(new THREE.SphereGeometry(0.32,24,18),hullMat);
+  tank.scale.set(0.72,0.55,1.25);tank.position.set(0,0.72,-0.28);g.add(tank);
+  var tail=new THREE.Mesh(new THREE.SphereGeometry(0.26,24,18),hullMat);
+  tail.scale.set(0.62,0.5,1.5);tail.position.set(0,0.78,0.72);g.add(tail);
+  var belly=new THREE.Mesh(new THREE.SphereGeometry(0.24,20,14),darkMat);
+  belly.scale.set(0.6,0.72,1.7);belly.position.set(0,0.42,-0.15);g.add(belly);
+  // glowing spine strip nose-to-tail
+  var spineG=new THREE.Mesh(new THREE.BoxGeometry(0.024,0.02,2.1),k?acc:MAT.redhot);
+  spineG.position.set(0,0.88,-0.05);spineG.rotation.x=-0.06;g.add(spineG);
+  // side accent blades
+  var sbg=new THREE.BoxGeometry(0.015,0.05,1.35);
+  var sbl=new THREE.Mesh(sbg,acc);sbl.position.set(-0.235,0.6,-0.2);sbl.rotation.z=0.1;g.add(sbl);
+  var sbr=new THREE.Mesh(sbg,acc);sbr.position.set(0.235,0.6,-0.2);sbr.rotation.z=-0.1;g.add(sbr);
+  // windscreen
+  var scr=new THREE.Mesh(new THREE.SphereGeometry(0.22,20,12,0,Math.PI*2,0,Math.PI/2),
+    new THREE.MeshStandardMaterial({color:0x0a1826,metalness:1,roughness:0.05,transparent:true,opacity:0.85}));
+  scr.scale.set(0.8,0.85,1.1);scr.position.set(0,0.8,-0.72);scr.rotation.x=-0.5;g.add(scr);
+  if(k){ // katana dorsal blade fin
+    var fin=new THREE.Mesh(new THREE.BoxGeometry(0.03,0.3,0.75),hullMat);
+    fin.position.set(0,1.0,0.6);fin.rotation.x=-0.3;g.add(fin);
+    var finE=new THREE.Mesh(new THREE.BoxGeometry(0.014,0.32,0.05),acc);
+    finE.position.set(0,1.02,0.94);finE.rotation.x=-0.3;g.add(finE);
+  }
+  var bars=new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.5,12),darkMat);
+  bars.rotation.z=Math.PI/2;bars.position.set(0,0.92,-0.8);g.add(bars);
+  var fkg=new THREE.CylinderGeometry(0.028,0.028,0.6,12);
+  var f1=new THREE.Mesh(fkg,MAT.metal);f1.position.set(-0.09,0.6,-0.92);f1.rotation.x=0.4;g.add(f1);
+  var f2=new THREE.Mesh(fkg,MAT.metal);f2.position.set(0.09,0.6,-0.92);f2.rotation.x=0.4;g.add(f2);
+  var hl=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.035,0.03),
+    new THREE.MeshBasicMaterial({color:0xe8f6ff}));
+  hl.position.set(0,0.66,k?-1.66:-1.5);g.add(hl);
+  var tb=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.05,0.03),MAT.redhot);
+  tb.position.set(0,0.84,1.42);g.add(tb);
+  var exGlowL=glowSprite(0xff8a2a,0.5);exGlowL.position.set(-0.12,0.5,1.28);g.add(exGlowL);
+  var exGlowR=glowSprite(0xff8a2a,0.5);exGlowR.position.set(0.12,0.5,1.28);g.add(exGlowR);
+  var rider=buildRider2(acc);g.add(rider);
+  return {g:g,spins:[{n:wF.userData.spin,ax:'z'},{n:wB.userData.spin,ax:'z'}],
+    spinR:0.4,exGlows:[exGlowL,exGlowR],rider:rider,riderPose:0.32,squash:0.38,hover:0,
+    lampY:0.66,lampZ:k?-1.68:-1.52};
+}
+function buildRider2(acc){ // smooth armored rider in full tuck
+  var r=new THREE.Group();
+  var suit=new THREE.MeshStandardMaterial({color:0x0b0c11,metalness:0.55,roughness:0.5});
+  var torso=new THREE.Mesh(new THREE.SphereGeometry(0.19,18,14),suit);
+  torso.scale.set(0.9,1.35,0.72);torso.position.y=0.26;torso.rotation.x=0.5;r.add(torso);
+  var hump=new THREE.Mesh(new THREE.SphereGeometry(0.1,12,10),suit);
+  hump.scale.set(1.4,0.8,1.6);hump.position.set(0,0.4,0.08);r.add(hump);
+  var stripe=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.02,0.02),acc);
+  stripe.position.set(0,0.43,-0.06);r.add(stripe);
+  var helmet=new THREE.MeshStandardMaterial({color:0x0a0a10,metalness:0.9,roughness:0.12});
+  var head=new THREE.Mesh(new THREE.SphereGeometry(0.125,18,14),helmet);
+  head.position.set(0,0.52,-0.16);r.add(head);
+  var visor=new THREE.Mesh(new THREE.SphereGeometry(0.129,16,10,0,Math.PI*2,0,Math.PI/2),MAT.redhot);
+  visor.rotation.x=-1.15;visor.position.set(0,0.52,-0.165);visor.scale.set(0.95,0.85,0.95);r.add(visor);
+  function arm(sx){
+    var a=new THREE.Group();
+    var up=new THREE.Mesh(new THREE.CylinderGeometry(0.045,0.04,0.3,10),suit);
+    up.position.set(sx*0.17,0.3,-0.14);up.rotation.x=1.0;up.rotation.z=sx*0.25;a.add(up);
+    var el=new THREE.Mesh(new THREE.SphereGeometry(0.05,10,8),suit);
+    el.position.set(sx*0.2,0.24,-0.28);a.add(el);
+    var fo=new THREE.Mesh(new THREE.CylinderGeometry(0.038,0.034,0.26,10),suit);
+    fo.position.set(sx*0.21,0.16,-0.4);fo.rotation.x=1.35;a.add(fo);
+    return a;
+  }
+  r.add(arm(-1),arm(1));
+  function leg(sx){
+    var l=new THREE.Group();
+    var th=new THREE.Mesh(new THREE.CylinderGeometry(0.055,0.05,0.3,10),suit);
+    th.position.set(sx*0.17,0.02,0.05);th.rotation.x=1.25;l.add(th);
+    var kn=new THREE.Mesh(new THREE.SphereGeometry(0.055,10,8),suit);
+    kn.position.set(sx*0.18,-0.03,0.18);l.add(kn);
+    var sh=new THREE.Mesh(new THREE.CylinderGeometry(0.042,0.04,0.3,10),suit);
+    sh.position.set(sx*0.18,-0.14,0.22);sh.rotation.x=0.25;l.add(sh);
+    return l;
+  }
+  r.add(leg(-1),leg(1));
+  r.position.set(0,0.84,0.18);r.rotation.x=0.32;
+  return r;
 }
 function buildCarPlayer(def){
   var g=new THREE.Group(),acc=accentMat(def.accent);
@@ -1255,7 +1310,8 @@ function buildTrike(def){
 }
 function buildVehicle(def){
   var o;
-  if(def.id==='ronin')o=buildCarPlayer(def);
+  if(def.id==='volt'&&BIKE_TPL)o=buildGltfBike(def);
+  else if(def.id==='ronin')o=buildCarPlayer(def);
   else if(def.id==='spectre')o=buildHover(def);
   else if(def.id==='aegis')o=buildTrike(def);
   else o=buildBike(def);
@@ -1707,6 +1763,121 @@ function mkCar(kind){
   CARS.push(c);return c;
 }
 ['sedan','sedan','sedan','sedan','taxi','taxi','van','van','sport','sport','sedan','taxi','sport','sedan'].forEach(mkCar);
+
+/* glTF car bodies (CC0 by Quaternius) — dress pool cars once templates load */
+var CAR_TPL={},BIKE_TPL=null;
+function prepBikeTemplate(root){
+  var holder=new THREE.Group();holder.add(root);
+  var box=new THREE.Box3().setFromObject(holder);
+  var size=box.getSize(new THREE.Vector3());
+  if(size.x>size.z){root.rotation.y=Math.PI/2;box.setFromObject(holder);size=box.getSize(new THREE.Vector3());}
+  var s=2.7/size.z;
+  root.scale.multiplyScalar(s);
+  box.setFromObject(holder);
+  var c=box.getCenter(new THREE.Vector3());
+  root.position.x-=c.x;root.position.z-=c.z;root.position.y-=box.min.y;
+  holder.traverse(function(n){ // night grade, keep its own paint
+    if(n.isMesh&&n.material){
+      (Array.isArray(n.material)?n.material:[n.material]).forEach(function(mm){
+        if(mm.color)mm.color.multiplyScalar(0.8);
+        if(mm.metalness!==undefined){mm.metalness=Math.max(mm.metalness,0.45);mm.roughness=Math.min(mm.roughness,0.55);}
+      });
+    }
+  });
+  box.setFromObject(holder);size=box.getSize(new THREE.Vector3());
+  return {obj:holder,hw:size.x/2,len:size.z,h:size.y};
+}
+function buildGltfBike(def){
+  var g=new THREE.Group(),acc=accentMat(def.accent);
+  var t=BIKE_TPL;
+  g.add(t.obj.clone());
+  var spins=[];
+  g.traverse(function(n){if(n.isMesh&&/wheel|tire|tyre/i.test(n.name||''))spins.push({n:n,ax:'x'});});
+  var tb=glowSprite(0xff3b3b,0.6);
+  tb.position.set(0,0.6,t.len/2+0.02);g.add(tb);
+  var exGlow=glowSprite(0xff8a2a,0.5);
+  exGlow.position.set(0.14,0.38,t.len/2-0.15);g.add(exGlow);
+  var rider=buildRider2(acc);
+  rider.position.set(0,0.78,0.22);g.add(rider);
+  return {g:g,spins:spins,spinR:0.42,exGlows:[exGlow],rider:rider,riderPose:0.55,
+    squash:0.34,hover:0,lampY:0.62,lampZ:-t.len/2+0.04};
+}
+function prepTemplate(root,kk){
+  var holder=new THREE.Group();holder.add(root);
+  var box=new THREE.Box3().setFromObject(holder);
+  var size=box.getSize(new THREE.Vector3());
+  if(size.x>size.z){root.rotation.y=Math.PI/2;box.setFromObject(holder);size=box.getSize(new THREE.Vector3());}
+  var s=((kk==='suv')?3.4:3.0)/size.z;
+  root.scale.multiplyScalar(s);
+  box.setFromObject(holder);
+  var c=box.getCenter(new THREE.Vector3());
+  root.position.x-=c.x;root.position.z-=c.z;root.position.y-=box.min.y;
+  holder.traverse(function(n){ // night re-grade: darker paint, glossier metal
+    if(n.isMesh&&n.material){
+      (Array.isArray(n.material)?n.material:[n.material]).forEach(function(mm){
+        if(mm.color)mm.color.multiplyScalar(0.5);
+        if(mm.metalness!==undefined){mm.metalness=Math.max(mm.metalness,0.6);mm.roughness=Math.min(mm.roughness,0.5);}
+      });
+    }
+  });
+  box.setFromObject(holder);size=box.getSize(new THREE.Vector3());
+  return {obj:holder,hw:size.x/2,len:size.z};
+}
+if(THREE.GLTFLoader)(function(){
+  var L=new THREE.GLTFLoader();
+  var files={car1:'models/car1.glb',car2:'models/car2.glb',suv:'models/suv.glb',
+             taxi:'models/taxi.glb',sports2:'models/sports2.glb',police:'models/police.glb'};
+  Object.keys(files).forEach(function(kk){
+    L.load(files[kk],function(res){
+      CAR_TPL[kk]=prepTemplate(res.scene,kk);
+      if(kk==='police')upgradeScenicPolice();
+    },undefined,function(){/* keep box fallback */});
+  });
+  L.load('models/moto5.glb',function(res){
+    BIKE_TPL=prepBikeTemplate(res.scene);
+    if(mode!=='play')setVehicle((mode==='garage')?VEHICLES[gIdx].id:SAVE.vehicle);
+  },undefined,function(){/* sculpted fallback */});
+})();
+function dressCar(c){
+  var pick=(c.kind==='sedan')?(Math.random()<0.5?'car1':'car2'):
+           (c.kind==='taxi')?'taxi':(c.kind==='van')?'suv':(c.kind==='sport')?'sports2':null;
+  if(!pick||!CAR_TPL[pick]||c.dressed===pick)return;
+  var t=CAR_TPL[pick];
+  while(c.g.children.length)c.g.remove(c.g.children[0]);
+  c.g.add(t.obj.clone());
+  c.hw=Math.min(1.05,t.hw+0.05);
+  c.wheels=[];
+  c.g.traverse(function(n){if(n.isMesh&&/wheel/i.test(n.name||''))c.wheels.push(n);});
+  var tGlow=glowSprite(0xff3b3b,0.9);
+  tGlow.position.set(0,0.6,t.len/2+0.1);tGlow.material.opacity=0.55;c.g.add(tGlow);
+  var hGlow=glowSprite(0xdfefff,0.7);
+  hGlow.position.set(0,0.5,-t.len/2-0.1);hGlow.material.opacity=0.4;c.g.add(hGlow);
+  var ig=new THREE.BoxGeometry(0.1,0.08,0.08);
+  c.iL=new THREE.Mesh(ig,new THREE.MeshBasicMaterial({color:0xffb54a}));
+  c.iL.position.set(-t.hw,0.6,t.len/2);c.g.add(c.iL);
+  c.iR=new THREE.Mesh(ig,new THREE.MeshBasicMaterial({color:0xffb54a}));
+  c.iR.position.set(t.hw,0.6,t.len/2);c.g.add(c.iR);
+  if(c.kind==='sport'){
+    var ug=glowSprite(NEONS_HEX[irnd(0,NEONS_HEX.length-1)],1.6);
+    ug.position.y=0.06;ug.material.opacity=0.4;c.g.add(ug);
+  }
+  c.dressed=pick;
+}
+function upgradeScenicPolice(){
+  var t=CAR_TPL.police;if(!t)return;
+  for(var i=0;i<police.length;i++){
+    var p=police[i];
+    while(p.children.length)p.remove(p.children[0]);
+    p.add(t.obj.clone());
+    var lb=new THREE.Mesh(new THREE.BoxGeometry(0.26,0.08,0.14),
+      new THREE.MeshBasicMaterial({color:0xff2233}));
+    lb.position.set(-0.14,1.15,0);p.add(lb);
+    var lb2=new THREE.Mesh(new THREE.BoxGeometry(0.26,0.08,0.14),
+      new THREE.MeshBasicMaterial({color:0x2266ff}));
+    lb2.position.set(0.14,1.15,0);p.add(lb2);
+    p.add(glowSprite(i%2?0xff2244:0x2266ff,1.6));
+  }
+}
 function takeCar(){
   for(var i=0;i<CARS.length;i++)if(!CARS[i].active)return CARS[i];
   return null;
@@ -1724,6 +1895,7 @@ function spawnCar(lane,z){
   c.lane=lane;c.frac=rnd(0.34,0.55);c.changeT=rnd(2.5,7);c.ind=0;
   c.g.position.set(LANE_X[lane],0,z);
   c.g.rotation.set(0,0,0);
+  dressCar(c);
   return c;
 }
 function carCrash(c){
@@ -1993,7 +2165,7 @@ function updBike(dt){
   bike.rotation.z=-S.lean;
   bike.rotation.y=-S.lean*0.35;
   bike.scale.y=1-(VEH.squash||0.38)*S.slF;
-  if(VEH.rider)VEH.rider.rotation.x=0.82+0.6*S.slF;
+  if(VEH.rider)VEH.rider.rotation.x=(VEH.riderPose!==undefined?VEH.riderPose:0.82)+0.6*S.slF;
   var om=S.eff/(VEH.spinR||0.38);
   for(var i=0;i<VEH.spins.length;i++){
     var sp=VEH.spins[i];

@@ -39,6 +39,12 @@ Open `index.html` from any static web server (or GitHub Pages). No build step.
 - Fully synthesized music and SFX (no audio assets), localStorage save,
   adaptive quality fallback for weaker devices.
 
+## Asset credits
+
+- Traffic & police cars: [Quaternius](https://poly.pizza/u/Quaternius) — CC0 (public domain), via Poly Pizza
+- VOLT RUNNER motorcycle: "Motorcycle" by [Poly by Google](https://poly.pizza/u/Poly%20by%20Google) — CC-BY, via Poly Pizza
+- All other vehicles, the rider, city and effects are procedurally generated in code
+
 ## Development
 
 - `vendor/` contains Three.js r128 plus the post-processing/reflector modules,
