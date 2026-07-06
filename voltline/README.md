@@ -28,12 +28,13 @@ Open `index.html` from any static web server (or GitHub Pages). No build step.
 
   | Vehicle | Type | Price |
   |---|---|---|
-  | VOLT RUNNER | rebel concept bike (balanced) | free |
+  | VOLT RUNNER | factory street bike (balanced) | free |
   | DRIFTER | street cruiser | 250 ◆ |
   | KATANA ZX | fast, agile, fragile superbike | 450 ◆ |
   | RONIN GT | armored muscle coupe | 1,000 ◆ |
   | SPECTRE X | fastest; gravlift hoverbike | 1,800 ◆ |
   | AEGIS MK-II | heavily armored trike | 2,800 ◆ |
+  | REBEL F1 | hubless concept bike | 3,500 ◆ |
 
 - **Speed** — cruising/top speed up ~150% over v1, with FOV stretch, speed
   lines and retuned spawning to match.
@@ -42,7 +43,8 @@ Open `index.html` from any static web server (or GitHub Pages). No build step.
 
 ## Asset credits
 
-- VOLT RUNNER: "Audi Rebel F1" concept bike — free Sketchfab download (add author credit here)
+- VOLT RUNNER: "Sci-fi bike" (bike + rider) — free Sketchfab download (add author credit here)
+- REBEL F1: "Audi Rebel F1" concept bike — free Sketchfab download (add author credit here)
 - Enemy chase car: "2058 Quadra Turbo-R V-Tech" — free Sketchfab download (add author credit here)
 - KATANA ZX: "Motorcycle concept sketch" — free Sketchfab download (add author credit here)
 - SPECTRE X: "Hoverbike post-apocalypse" — free Sketchfab download (add author credit here)
