@@ -64,7 +64,7 @@ Open `index.html` from any static web server (or GitHub Pages). No build step.
 
 ## Development
 
-- `vendor/` contains Three.js r128 plus the post-processing/reflector modules,
+- `vendor/` contains Three.js r147 plus the post-processing/reflector modules,
   vendored locally so the game works offline and can later be wrapped for the
   App Store / Play Store (e.g. with Capacitor) without CDN dependencies.
 - Append `?debug=1` to the URL to expose `window.__VL` test hooks
